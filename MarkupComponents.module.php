@@ -16,7 +16,7 @@
  *
  */
 
-class MarkupComponents extends WireData implements ConfigurableModule {
+class MarkupComponents extends WireData implements Module, ConfigurableModule {
 
 	private WireArray $components;
 	private WireArray $scriptsHead;
@@ -25,14 +25,46 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 
 	public function __construct() {
 		parent::__construct();
+		$this->set("autoAddAssets", 0);
+		$this->set("autoFuel", 0);
+		$this->set("fuelName", "mc");
 		$this->set("functionsApi", 0);
 		$this->set("useConfig", 0);
 	}
 
 	public function init() {
-		if($this->functionsApi) {
-			include_once __DIR__ . "MarkupComponentsFunctions.php";
+		$this->components = new WireArray();
+		$this->scriptsHead = new WireArray();
+		$this->scripts = new WireArray();
+		$this->styles = new WireArray();
+		if($this->autoAddAssets) {
+			$this->addHookAfter("PageRender::renderPage", $this, "addAssets");
 		}
+		if($this->autoFuel) {
+			if($this->wire($this->fuelName)) {
+				$this->set("fuelError", $this->fuelName);
+				$this->set("fuelName", "mc");
+				$this->modules->saveConfig($this, "fuelName", "mc");
+			} else {
+				$this->wire($this->fuelName ?: "mc", $this);
+			}
+		}
+		if($this->functionsApi && $this->page->template != "admin") {
+			include_once __DIR__ . "/MarkupComponentsFunctions.php";
+		}
+	}
+
+	protected function addAssets(HookEvent $event) {
+		$parentEvent = $event->arguments(0);
+		$html = $parentEvent->return;
+		// todo: handle ajax loading
+		// $components = "<script>const components = [{$this->listComponents()}]</script>";
+		$headScripts = $this->printScripts(true);
+		$scripts = $this->printScripts();
+		$styles = $this->printStyles();
+		$html = str_replace("</head>", "{$styles}{$headScripts}</head>", $html);
+		$html = str_replace("</body>", "{$scripts}</body>", $html);
+		$parentEvent->return = $html;
 	}
 
 	public function getComponents() {
@@ -45,7 +77,7 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 	 * @return string
 	 * 
 	 */
-	public function listComponents($options) {
+	public function listComponents($options = []) {
 		$defaultOptions = [
 			"separator" => ",",
 			"quote" => "\"",
@@ -104,7 +136,7 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 			]);
 		}
 		if($this->useConfig) {
-			$this->wire()->config->scripts->add($fullPath);
+			$this->config->scripts->add($fullPath);
 		}
 	}
 
@@ -181,7 +213,7 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 			"attr" => $this->attrToString($attr)
 		]);
 		if($this->useConfig) {
-			$this->wire()->config->styles->add($fullPath);
+			$this->config->styles->add($fullPath);
 		}
 	}
 
@@ -243,8 +275,8 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 	}
 	
 	private function getPathAndUrl($filename = "") {
-		$tplPath = $this->wire()->config->paths->templates;
-		$tplUrl = $this->wire()->config->urls->templates;
+		$tplPath = $this->config->paths->templates;
+		$tplUrl = $this->config->urls->templates;
 		if(strpos($filename, "site") === 0) $filename = "/$filename";
 		if(strpos($filename, $tplPath) !== false) {
 			$path = $filename;
@@ -277,7 +309,7 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 	public function component($name, $vars = [], $isSnippet = false) {
 		if(!$name) return "";
 		$path = $isSnippet ? "snippets" : "components";
-		$tpl = $this->wire()->config->paths->templates;
+		$tpl = $this->config->paths->templates;
 		$folders = explode("/", $name);
 		$name = $folders[count($folders) - 1];
 		for($i = 0; $i < count($folders) - 1; $i++) {
@@ -315,5 +347,63 @@ class MarkupComponents extends WireData implements ConfigurableModule {
 	public function snippet($name = "", $vars = []) {
 		if(!$name) return "";
 		return $this->component($name, $vars, true);
+	}
+
+	public function getModuleConfigInputfields(InputfieldWrapper $inputfields) {
+		$modules = $this->modules;
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "autoFuel");
+		$f->columnWidth = 50;
+		$f->label = $this->_("Automatically instanciate this module?");
+		$f->label2 = $this->_("Yes");
+		$f->description = $this->_("The module will be instanciated and made available in your template code through the `\$$this->fuelName` variable");
+		$f->checked = $this->autoFuel;
+		$inputfields->add($f);
+	
+		/** @var InputfieldText $f */
+		$f = $modules->get("InputfieldText");
+		$f->attr("name", "fuelName");
+		$f->columnWidth = 50;
+		$f->label = $this->_("Customize variable name");
+		$f->description = $this->_("Default: `\$mc`");
+		$f->showIf = "autoFuel=1";
+		if($this->fuelError) {
+			$f->error($this->_("Please choose a variable name that is not already used by Processwire or another module"));
+			$f->attr("value", $this->fuelError);
+		} else {
+			$f->attr("value", $this->fuelName);
+		}
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "functionsApi");
+		$f->label = $this->_("Use Functions API?");
+		$f->label2 = $this->_("Yes");
+		$f->description = sprintf(
+			$this->_("This allows you to use the module’s functions without having instanciating it, e.g.: `component()` instead of `%s->component()`"),
+			$this->autoFuel ? "\$$this->fuelName" : "\$modules->get('MarkupComponents')"
+		);
+		$f->checked = $this->functionsApi;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "autoAddAssets");
+		$f->label = $this->_("Automatically add .css and .js files on page render?");
+		$f->label2 = $this->_("Yes");
+		$f->checked = $this->autoAddAssets;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "useConfig");
+		$f->label = $this->_("Add .css and .js to \$config?"); 
+		$f->label2 = $this->_("Yes");
+		$f->description = $this->_("When calling `component()` or `snippet()`, associated .css and .js files are added to an internal WireArray that you can output using `printStyles()` and `printScripts()`. This option allows you to have these added to `\$config->styles` and `\$config->scripts` as well.");
+		$f->checked = $this->useConfig;
+		$inputfields->add($f);
 	}
 }
