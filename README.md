@@ -28,8 +28,8 @@ Assuming your folder is like this:
 /templates
 ↳ /components
   ↳ /slideshow
-	↳ slideshow.css
-	↳ slideshow.js
+    ↳ slideshow.css
+    ↳ slideshow.js
     ↳ slideshow.php
 ```
 
