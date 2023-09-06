@@ -359,7 +359,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->label = $this->_("Automatically instanciate this module?");
 		$f->label2 = $this->_("Yes");
 		$f->description = $this->_("The module will be instanciated and made available in your template code through the `\$$this->fuelName` variable");
-		$f->checked = $this->autoFuel;
+		$f->checked = !!$this->autoFuel;
 		$inputfields->add($f);
 	
 		/** @var InputfieldText $f */
@@ -386,7 +386,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			$this->_("This allows you to use the module’s functions without having instanciating it, e.g.: `component()` instead of `%s->component()`"),
 			$this->autoFuel ? "\$$this->fuelName" : "\$modules->get('MarkupComponents')"
 		);
-		$f->checked = $this->functionsApi;
+		$f->checked = !!$this->functionsApi;
 		$inputfields->add($f);
 	
 		/** @var InputfieldCheckbox $f */
@@ -394,7 +394,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->attr("name", "autoAddAssets");
 		$f->label = $this->_("Automatically add .css and .js files on page render?");
 		$f->label2 = $this->_("Yes");
-		$f->checked = $this->autoAddAssets;
+		$f->checked = !!$this->autoAddAssets;
 		$inputfields->add($f);
 	
 		/** @var InputfieldCheckbox $f */
@@ -403,7 +403,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->label = $this->_("Add .css and .js to \$config?"); 
 		$f->label2 = $this->_("Yes");
 		$f->description = $this->_("When calling `component()` or `snippet()`, associated .css and .js files are added to an internal WireArray that you can output using `printStyles()` and `printScripts()`. This option allows you to have these added to `\$config->styles` and `\$config->scripts` as well.");
-		$f->checked = $this->useConfig;
+		$f->checked = !!$this->useConfig;
 		$inputfields->add($f);
 	}
 }
