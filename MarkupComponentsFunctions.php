@@ -2,7 +2,7 @@
 
 function callMarkupComponentsFunction($name, ...$arguments) {
 	$markupComponentsInstance = wire()->modules->get("MarkupComponents");
-	if(method_exists("MarkupComponents", $name)) {
+	if(method_exists("ProcessWire\MarkupComponents", $name)) {
 		return $markupComponentsInstance->{$name}(...$arguments);
 	}
 }
@@ -63,6 +63,7 @@ if(!function_exists("scripts")) {
 	 * 
 	 */
 	function scripts($head = false) {
+		bd("scripts");
 		return callMarkupComponentsFunction("scripts", $head);
 	}
 }
