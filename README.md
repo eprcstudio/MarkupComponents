@@ -73,6 +73,6 @@ For these to be output in your HTML, you will need to use:
 There’s a few options you can toggle to accomodate your coding style:
 
 - You can automatically instanciate the module with a custom variable name
-- With the Functions API you can use the module’s functions directly, e.g.: `component()` instead of `$mc->component()`
+- With the Functions API you can use the module’s functions directly, e.g.: `component()` instead of `$mc->component()`. Note this is does not relate to [`$config->useFunctionsAPI`](https://processwire.com/api/ref/functions/#pwapi-methods-Functions-API)
 - You can automatically add `.css` and `.js` files on page render
 - If for a reason or another you would like to have the `.css` and `.js` added to `$config->styles` and `$config->scripts`, you can do so
