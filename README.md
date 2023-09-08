@@ -55,7 +55,7 @@ For these to be output in your HTML, you will need to use:
 
 ### Notes
 
-- You can use the module’s `script("path/to/js")` or `style("path/to/css)` to add your own files
+- You can use the module’s `script("path/to/js")` or `style("path/to/css")` functions to add your own files
 - Behind the scene, calling `component()` (or `snippet()`) generates the component’s markup using `wireRenderFile`, meaning you have access to all PW API variables and why you can specify your own variables by passing an array as the second argument
 - Shorter functions are available:
   
