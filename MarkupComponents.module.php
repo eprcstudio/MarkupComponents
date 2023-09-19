@@ -125,15 +125,19 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			$addToHead = false;
 		}
 		if($addToHead) {
-			$this->scriptsHead->add((object)[
-				"src" => $fullPath, 
-				"attr" => $this->attrToString($attr)
-			]);
+			if(!$this->scriptsHead->has("src=$fullPath")) {
+				$this->scriptsHead->add(WireData([
+					"src" => $fullPath,
+					"attr" => $this->attrToString($attr)
+				]));
+			}
 		} else {
-			$this->scripts->add((object)[
-				"src" => $fullPath, 
-				"attr" => $this->attrToString($attr)
-			]);
+			if(!$this->scripts->has("src=$fullPath")) {
+				$this->scripts->add(WireData([
+					"src" => $fullPath,
+					"attr" => $this->attrToString($attr)
+				]));
+			}
 		}
 		if($this->useConfig) {
 			$this->config->scripts->add($fullPath);
@@ -208,10 +212,12 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			if(!file_exists($path)) return;
 			$fullPath = "$url?v=" . filemtime($path);
 		}
-		$this->styles->add((object)[
-			"src" => $fullPath, 
-			"attr" => $this->attrToString($attr)
-		]);
+		if(!$this->styles->has("src=$fullPath")) {
+			$this->styles->add(WireData([
+				"src" => $fullPath,
+				"attr" => $this->attrToString($attr)
+			]));
+		}
 		if($this->useConfig) {
 			$this->config->styles->add($fullPath);
 		}
