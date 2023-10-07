@@ -63,7 +63,6 @@ if(!function_exists("scripts")) {
 	 * 
 	 */
 	function scripts($head = false) {
-		bd("scripts");
 		return callMarkupComponentsFunction("scripts", $head);
 	}
 }
