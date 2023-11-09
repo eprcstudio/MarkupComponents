@@ -1,9 +1,8 @@
 <?php namespace ProcessWire;
 
 function callMarkupComponentsFunction($name, ...$arguments) {
-	$markupComponentsInstance = wire()->modules->get("MarkupComponents");
 	if(method_exists("ProcessWire\MarkupComponents", $name)) {
-		return $markupComponentsInstance->{$name}(...$arguments);
+		return wire()->modules->get("MarkupComponents")->{$name}(...$arguments);
 	}
 }
 
