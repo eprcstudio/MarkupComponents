@@ -30,6 +30,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$this->set("fuelName", "mc");
 		$this->set("functionsApi", 0);
 		$this->set("useConfig", 0);
+		$this->set("useConfig", 0);
 	}
 
 	public function init() {
@@ -57,14 +58,25 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	protected function addAssets(HookEvent $event) {
 		$parentEvent = $event->arguments(0);
 		$html = $parentEvent->return;
-		// todo: handle ajax loading
-		// $components = "<script>const components = [{$this->listComponents()}]</script>";
-		$headScripts = $this->printScripts(true);
+		$scriptsHead = $this->printScripts(true);
 		$scripts = $this->printScripts();
 		$styles = $this->printStyles();
-		$html = str_replace("</head>", "{$styles}{$headScripts}</head>", $html);
+		$html = str_replace("</head>", "{$styles}{$scriptsHead}</head>", $html);
 		$html = str_replace("</body>", "{$scripts}</body>", $html);
-		$parentEvent->return = $html;
+		if($this->overwriteAjax && $event->config->ajax) {
+			header("Content-Type: application/json");
+			$json = [
+				"html" => $html,
+				"styles" => [...$this->styles->each(["src", "attr"])],
+				"scripts" => [
+					...$this->scriptsHead->each(["src", "attr"]),
+					...$this->scripts->each(["src", "attr"])
+				]
+			];
+			$parentEvent->return = json_encode($json);
+		} else {
+			$parentEvent->return = $html;
+		}
 	}
 
 	public function getComponents() {
@@ -401,6 +413,15 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->label = $this->_("Automatically add .css and .js files on page render?");
 		$f->label2 = $this->_("Yes");
 		$f->checked = !!$this->autoAddAssets;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "overwriteAjax");
+		$f->label = $this->_("Overwrite ajax calls?");
+		$f->label2 = $this->_("Yes");
+		$f->description = $this->_("If you make an ajax call (using `$.ajax()` or `fetch()`), you may use this option to overwrite the page render process and wrap its output in a json, along with the `<script>` and `<style>` added by MarkupComponents.");
+		$f->checked = !!$this->overwriteAjax;
 		$inputfields->add($f);
 	
 		/** @var InputfieldCheckbox $f */
