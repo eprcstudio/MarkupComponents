@@ -1,7 +1,7 @@
 <?php namespace ProcessWire;
 
 function callMarkupComponentsFunction($name, ...$arguments) {
-	if(method_exists("ProcessWire\MarkupComponents", $name)) {
+	if(is_callable("ProcessWire\MarkupComponents", $name)) {
 		return wire()->modules->get("MarkupComponents")->{$name}(...$arguments);
 	}
 }
