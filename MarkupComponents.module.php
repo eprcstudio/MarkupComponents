@@ -29,7 +29,8 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$this->set("autoFuel", 0);
 		$this->set("fuelName", "mc");
 		$this->set("functionsApi", 0);
-		$this->set("useConfig", 0);
+		$this->set("overwriteAjax", 0);
+		$this->set("importHelperJs", 0);
 		$this->set("useConfig", 0);
 	}
 
@@ -56,14 +57,22 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	protected function addAssets(HookEvent $event) {
+		/** @var Config $config */
+		$config = $event->config;
 		$parentEvent = $event->arguments(0);
-		$html = $parentEvent->return;
+		if($this->overwriteAjax && $this->importHelperJs && !$config->ajax) {
+			$this->scriptsHead->prepend(WireData([
+				"src" => "{$config->urls->siteModules}{$this}/MarkupComponentsHelper.js",
+				"attr" => ""
+			]));
+		}
 		$scriptsHead = $this->printScripts(true);
 		$scripts = $this->printScripts();
 		$styles = $this->printStyles();
+		$html = $parentEvent->return;
 		$html = str_replace("</head>", "{$styles}{$scriptsHead}</head>", $html);
 		$html = str_replace("</body>", "{$scripts}</body>", $html);
-		if($this->overwriteAjax && $event->config->ajax) {
+		if($this->overwriteAjax && $config->ajax) {
 			header("Content-Type: application/json");
 			$json = [
 				"html" => $html,
@@ -136,24 +145,20 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			$attr = $addToHead;
 			$addToHead = false;
 		}
+		$script = WireData([ "src" => $fullPath, "attr" => $attr ]);
 		if($addToHead) {
 			if(!$this->scriptsHead->has("src=$fullPath")) {
-				$this->scriptsHead->add(WireData([
-					"src" => $fullPath,
-					"attr" => $this->attrToString($attr)
-				]));
+				$this->scriptsHead->add($script);
 			}
 		} else {
 			if(!$this->scripts->has("src=$fullPath")) {
-				$this->scripts->add(WireData([
-					"src" => $fullPath,
-					"attr" => $this->attrToString($attr)
-				]));
+				$this->scripts->add($script);
 			}
 		}
 		if($this->useConfig) {
 			$this->config->scripts->add($fullPath);
 		}
+		return $script;
 	}
 
 	/**
@@ -186,7 +191,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function printScripts($head = false) {
 		$str = "";
 		foreach($this->getScripts($head) as $script) {
-			$str .= "<script src=\"$script->src\" $script->attr></script>";
+			$str .= "<script src=\"$script->src\" {$this->attrToString($script->attr)}></script>";
 		}
 		return $str;
 	}
@@ -224,15 +229,14 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			if(!file_exists($path)) return;
 			$fullPath = "$url?v=" . filemtime($path);
 		}
+		$style = WireData([ "src" => $fullPath, "attr" => $attr ]);
 		if(!$this->styles->has("src=$fullPath")) {
-			$this->styles->add(WireData([
-				"src" => $fullPath,
-				"attr" => $this->attrToString($attr)
-			]));
+			$this->styles->add($style);
 		}
 		if($this->useConfig) {
 			$this->config->styles->add($fullPath);
 		}
+		return $style;
 	}
 
 	/**
@@ -263,7 +267,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function printStyles() {
 		$str = "";
 		foreach($this->styles as $style) {
-			$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" $style->attr>";
+			$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" {$this->attrToString($style->attr)}>";
 		}
 		return $str;
 	}
@@ -336,6 +340,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		if(file_exists("{$tpl}$path/$name/$name.php")) {
 			$path .= "/$name";
 		}
+		$component = wireRenderFile("{$tpl}$path/$name.php", $vars);
 		if(!$this->components->has("$path/$name")) {
 			if(file_exists("{$tpl}$path/$name.js")) {
 				$this->script("$path/$name.js", $vars["attrScript"] ?? []);
@@ -345,7 +350,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			}
 			$this->components->add("$path/$name");
 		}
-		return wireRenderFile("{$tpl}$path/$name.php", $vars);
+		return $component;
 	}
 
 	/**
@@ -401,7 +406,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->label = $this->_("Use Functions API?");
 		$f->label2 = $this->_("Yes");
 		$f->description = sprintf(
-			$this->_("This allows you to use the module’s functions without having instanciating it, e.g.: `component()` instead of `%s->component()`"),
+			$this->_("This allows you to use the module’s functions without having to instanciate it, e.g.: `component()` instead of `%s->component()`"),
 			$this->autoFuel ? "\$$this->fuelName" : "\$modules->get('MarkupComponents')"
 		);
 		$f->checked = !!$this->functionsApi;
@@ -418,10 +423,22 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		/** @var InputfieldCheckbox $f */
 		$f = $modules->get("InputfieldCheckbox");
 		$f->attr("name", "overwriteAjax");
+		$f->columnWidth = 50;
 		$f->label = $this->_("Overwrite ajax calls?");
 		$f->label2 = $this->_("Yes");
 		$f->description = $this->_("If you make an ajax call (using `$.ajax()` or `fetch()`), you may use this option to overwrite the page render process and wrap its output in a json, along with the `<script>` and `<style>` added by MarkupComponents.");
 		$f->checked = !!$this->overwriteAjax;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "importHelperJs");
+		$f->columnWidth = 50;
+		$f->label = $this->_("Import helper js?");
+		$f->label2 = $this->_("Yes");
+		$f->description = $this->_("This js file exposes a `MarkupComponents` variable allowing you to simply handle ajax calls and styles/scripts imports.");
+		$f->showIf = "overwriteAjax=1";
+		$f->checked = !!$this->importHelperJs;
 		$inputfields->add($f);
 	
 		/** @var InputfieldCheckbox $f */
