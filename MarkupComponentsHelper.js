@@ -121,7 +121,7 @@ const MarkupComponents = (function() {
 	 */
 	function on(event, listener, triggerAfterAjax = false) {
 		if(event === "load") {
-			if(document.readyState === "complete" && !triggerAfterAjax) {
+			if(document.readyState === "complete") {
 				listener();
 			} else {
 				window.addEventListener("load", listener);
