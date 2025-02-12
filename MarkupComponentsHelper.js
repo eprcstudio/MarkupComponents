@@ -99,7 +99,7 @@ const MarkupComponents = (function() {
 				target = document.querySelector(target);
 				if(!target) reject();
 			}
-			const { html, scripts } = extractScriptsFrom(json.html);
+			const { html, scripts } = extractScripts(json.html);
 			for(const type of ["styles", "scripts"]) {
 				if(!json[type]) continue;
 				for(const file of json[type]) {
@@ -141,7 +141,7 @@ const MarkupComponents = (function() {
 		});
 	}
 
-	function extractScriptsFrom(html) {
+	function extractScripts(html) {
 		const regex = /<script(?<attributes>.*)>(?<content>(?:.|\n)*?)<\/script>/gm;
 		const matches = html.matchAll(regex);
 		const scripts = [];
