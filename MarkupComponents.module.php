@@ -22,6 +22,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	private WireArray $scriptsHead;
 	private WireArray $scripts;
 	private WireArray $styles;
+	private WireArray $stylesNoscript;
 
 	public function __construct() {
 		parent::__construct();
@@ -31,7 +32,6 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$this->set("functionsApi", 0);
 		$this->set("overwriteAjax", 0);
 		$this->set("importHelperJs", 0);
-		$this->set("useConfig", 0);
 	}
 
 	public function init() {
@@ -39,6 +39,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$this->scriptsHead = new WireArray();
 		$this->scripts = new WireArray();
 		$this->styles = new WireArray();
+		$this->stylesNoscript = new WireArray();
 		if($this->autoAddAssets) {
 			$this->addHookAfter("PageRender::renderPage", $this, "addAssets");
 		}
@@ -155,10 +156,6 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 				$this->scripts->add($script);
 			}
 		}
-		if($this->useConfig) {
-			$this->config->scripts->add($fullPath);
-		}
-		return $script;
 	}
 
 	/**
@@ -229,14 +226,19 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			if(!file_exists($path)) return;
 			$fullPath = "$url?v=" . filemtime($path);
 		}
-		$style = WireData([ "src" => $fullPath, "attr" => $attr ]);
-		if(!$this->styles->has("src=$fullPath")) {
-			$this->styles->add($style);
+		if(array_key_exists("noscript", $attr) && $attr["noscript"]) {
+			if(!$this->stylesNoscript->has("src=$fullPath")) {
+				$this->stylesNoscript->add(WireData([
+					"src" => $fullPath,
+					"content" => file_get_contents($path)
+				]));
+			}
+		} elseif(!$this->styles->has("src=$fullPath")) {
+			$this->styles->add(WireData([
+				"src" => $fullPath,
+				"attr" => $this->attrToString($attr)
+			]));
 		}
-		if($this->useConfig) {
-			$this->config->styles->add($fullPath);
-		}
-		return $style;
 	}
 
 	/**
@@ -248,6 +250,16 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	 */
 	public function css($filename, $attr = []) {
 		$this->style($filename, $attr);
+	}
+
+	/**
+	 * Add the css file’s content in a `<noscript>` tag
+	 * 
+	 * @param string $filename Filename or URL pointing to the style file
+	 * 
+	 */
+	public function noscript($filename) {
+		$this->style($filename, ["noscript" => true]);
 	}
 
 	/**
@@ -268,6 +280,13 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$str = "";
 		foreach($this->styles as $style) {
 			$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" {$this->attrToString($style->attr)}>";
+		}
+		if($this->stylesNoscript->count()) {
+			$str .= "<noscript><style>";
+			foreach($this->stylesNoscript as $style) {
+				$str .= $style->content;
+			}
+			$str .= "</style></noscript>";
 		}
 		return $str;
 	}
@@ -340,7 +359,29 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		if(file_exists("{$tpl}$path/$name/$name.php")) {
 			$path .= "/$name";
 		}
-		$component = wireRenderFile("{$tpl}$path/$name.php", $vars);
+		if(file_exists("{$tpl}$path/$name.view.php")) {
+			$temp = wireFiles()->tempDir($isSnippet ? "snippets" : "components");
+			$tempPath = $temp->get();
+			$contents = file_get_contents("{$tpl}$path/$name.php");
+			$tokens = token_get_all($contents);
+			$appendCloseTag = false;
+			foreach ($tokens as $token) {
+				if (is_array($token)) {
+					if (token_name($token[0]) === 'T_CLOSE_TAG')
+					$appendCloseTag = false;
+					elseif (token_name($token[0]) === 'T_OPEN_TAG')
+					$appendCloseTag = true;
+				}
+			}
+			if($appendCloseTag) {
+				$contents .= "?>";
+			}
+			$contents .= file_get_contents("{$tpl}$path/$name.view.php");
+			file_put_contents("{$tempPath}$name.php", $contents);
+			$out = wireRenderFile("{$tempPath}$name.php", $vars);
+		} else {
+			$out = wireRenderFile("{$tpl}$path/$name.php", $vars);
+		}
 		if(!$this->components->has("$path/$name")) {
 			if(file_exists("{$tpl}$path/$name.js")) {
 				$this->script("$path/$name.js", $vars["attrScript"] ?? []);
@@ -348,9 +389,12 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			if(file_exists("{$tpl}$path/$name.css")) {
 				$this->style("$path/$name.css", $vars["attrStyle"] ?? []);
 			}
+			if(file_exists("{$tpl}$path/$name.noscript.css")) {
+				$this->noscript("$path/$name.noscript.css");
+			}
 			$this->components->add("$path/$name");
 		}
-		return $component;
+		return $out;
 	}
 
 	/**
@@ -439,15 +483,6 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->description = $this->_("This js file exposes a `MarkupComponents` variable allowing you to simply handle ajax calls and styles/scripts imports.");
 		$f->showIf = "overwriteAjax=1";
 		$f->checked = !!$this->importHelperJs;
-		$inputfields->add($f);
-	
-		/** @var InputfieldCheckbox $f */
-		$f = $modules->get("InputfieldCheckbox");
-		$f->attr("name", "useConfig");
-		$f->label = $this->_("Add .css and .js to \$config?"); 
-		$f->label2 = $this->_("Yes");
-		$f->description = $this->_("When calling `component()` or `snippet()`, associated .css and .js files are added to an internal WireArray that you can output using `printStyles()` and `printScripts()`. This option allows you to have these added to `\$config->styles` and `\$config->scripts` as well.");
-		$f->checked = !!$this->useConfig;
 		$inputfields->add($f);
 	}
 }

@@ -95,6 +95,18 @@ if(!function_exists("css")) {
 	}
 }
 
+if(!function_exists("noscript")) {
+	/**
+	 * Add the css file’s content in a `<noscript>` tag
+	 * 
+	 * @param string $filename Filename or URL pointing to the style file
+	 * 
+	 */
+	function noscript($filename) {
+		callMarkupComponentsFunction("noscript", $filename);
+	}
+}
+
 if(!function_exists("printStyles")) {
 	/**
 	 * Prints the `<style>` tags
