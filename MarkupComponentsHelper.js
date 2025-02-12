@@ -1,6 +1,15 @@
 const MarkupComponents = (function() {
 	const ajaxListeners = [];
-	const headers = new Headers({"X-Requested-With": "XMLHttpRequest"});
+	const headers = new Headers({
+		"Content-Type": "application/json",
+		"X-Requested-With": "XMLHttpRequest"
+	});
+
+	window.addEventListener("popstate", (e) => {
+		if(e.state.history) {
+			location.reload();
+		}
+	});
 
 	/**
 	 * Load a page using `fetch` and then replace the target’s content. It will
@@ -24,43 +33,20 @@ const MarkupComponents = (function() {
 			if(!target) return;
 		}
 		options = Object.assign({
+			body: {},
 			delay: 0,
 			history: false,
 			historyIgnoreSegment: ""
 		}, options);
 		const time = Date.now();
 		return new Promise((resolve, reject) => {
-			fetch(href, { headers })
+			fetch(href, {
+				method: "POST",
+				body: JSON.stringify(options.body),
+				headers
+			})
 				.then((res) => res.json())
 				.then((json) => {
-					const { html, scripts } = extractScripts(json.html);
-					for(const type of ["styles", "scripts"]) {
-						if(!json[type]) continue;
-						for(const file of json[type]) {
-							const isJs = type === "scripts";
-							const href = isJs ? "src" : "href";
-							// skip already imported files
-							if(document.querySelector(`[${href}="${file.src}"]`)) continue;
-							const tag = document.createElement(isJs ? "script" : "link");
-							tag[href] = file.src;
-							if(!isJs) {
-								tag.rel = "stylesheet";
-								tag.type = "text/css";
-							} else {
-								// load synchronously, in case of js dependencies
-								tag.async = false;
-							}
-							for(const name in file.attr) {
-								const value = file.attr[name];
-								if(isNaN(parseInt(name))) {
-									tag.setAttribute(name, value);
-								} else {
-									tag.setAttribute(value, "");
-								}
-							}
-							document.head.appendChild(tag);
-						}
-					}
 					if(options.history) {
 						if(
 							options.historyIgnoreSegment &&
@@ -69,19 +55,15 @@ const MarkupComponents = (function() {
 							const index = href.lastIndexOf(options.historyIgnoreSegment);
 							href = href.slice(0, index);
 						}
-						history.pushState("", "", href);
+						history.pushState({ history: true }, "", href);
 					}
-					setTimeout(() => {
-						target.innerHTML = "";
-						target.insertAdjacentHTML("beforeend", html);
-						scripts.forEach((script) => {
-							target.appendChild(script);
-						});
-						requestAnimationFrame(() => {
-							trigger("ajax");
-							resolve();
-						});
-					}, options.delay - (Date.now() - time));
+					options.delay -= Date.now() - time;
+					insertHtml(json, target, options.delay)
+						.then(resolve)
+						.catch((error) => {
+							console.log(error);
+							reject();
+						})
 				})
 				.catch((error) => {
 					console.error(error);
@@ -90,7 +72,76 @@ const MarkupComponents = (function() {
 		});
 	}
 
-	function extractScripts(html) {
+	function generateSelector(element) {
+		if(!(element instanceof HTMLElement)) return "";
+		if(element.tagName.toLowerCase() == "body") {
+			return "body";
+		}
+		let selector = element.tagName.toLowerCase();
+		selector += (element.id != "") ? `#${element.id}` : "";
+		if(element.className) {
+			const classes = element.className.split(/\s/);
+			for(let i = 0; i < classes.length; i++) {
+				if(element.parentElement.querySelectorAll(selector).length === 1) break;
+				selector += `.${classes[i]}`;
+			}
+		}
+		if(element.parentElement.querySelectorAll(selector).length > 1) {
+			selector += `:nth-child(${Array.from(element.parentElement.children).indexOf(element)})`;
+		}
+		return generateSelector(element.parentElement) + " > " + selector;
+	}
+
+	function insertHtml(json, target, delay = 0) {
+		return new Promise((resolve, reject) => {
+			if(!json || !target) reject();
+			if(typeof target === "string") {
+				target = document.querySelector(target);
+				if(!target) reject();
+			}
+			const { html, scripts } = extractScriptsFrom(json.html);
+			for(const type of ["styles", "scripts"]) {
+				if(!json[type]) continue;
+				for(const file of json[type]) {
+					const isJs = type === "scripts";
+					const href = isJs ? "src" : "href";
+					// skip already imported files
+					if(document.querySelector(`[${href}="${file.src}"]`)) continue;
+					const tag = document.createElement(isJs ? "script" : "link");
+					tag[href] = file.src;
+					if(!isJs) {
+						tag.rel = "stylesheet";
+						tag.type = "text/css";
+					} else {
+						// load synchronously, in case of js dependencies
+						tag.async = false;
+					}
+					for(const name in file.attr) {
+						const value = file.attr[name];
+						if(isNaN(parseInt(name))) {
+							tag.setAttribute(name, value);
+						} else {
+							tag.setAttribute(value, "");
+						}
+					}
+					document.head.appendChild(tag);
+				}
+			}
+			setTimeout(() => {
+				target.innerHTML = "";
+				target.insertAdjacentHTML("beforeend", html);
+				scripts.forEach((script) => {
+					target.appendChild(script);
+				});
+				requestAnimationFrame(() => {
+					trigger("ajax");
+					resolve();
+				});
+			}, Math.max(0, delay));
+		});
+	}
+
+	function extractScriptsFrom(html) {
 		const regex = /<script(?<attributes>.*)>(?<content>(?:.|\n)*?)<\/script>/gm;
 		const matches = html.matchAll(regex);
 		const scripts = [];
