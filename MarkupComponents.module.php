@@ -62,10 +62,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$config = $event->config;
 		$parentEvent = $event->arguments(0);
 		if($this->overwriteAjax && $this->importHelperJs && !$config->ajax) {
-			$this->scriptsHead->prepend(WireData([
-				"src" => "{$config->urls->siteModules}{$this}/MarkupComponentsHelper.js",
-				"attr" => ""
-			]));
+			$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
 		}
 		$scriptsHead = $this->printScripts(true);
 		$scripts = $this->printScripts();
@@ -137,7 +134,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		} else {
 			if(strpos($filename, ".js") === false) {
 				$filename .= ".js";
-			} 
+			}
 			[$path, $url] = $this->getPathAndUrl($filename);
 			if(!file_exists($path)) return;
 			$fullPath = "$url?v=" . filemtime($path);
@@ -316,6 +313,8 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 	
 	private function getPathAndUrl($filename = "") {
+		$sitePath = $this->config->paths->site;
+		$siteUrl = $this->config->urls->site;
 		$tplPath = $this->config->paths->templates;
 		$tplUrl = $this->config->urls->templates;
 		if(strpos($filename, "site") === 0) $filename = "/$filename";
@@ -324,6 +323,12 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			$url = str_replace($tplPath, $tplUrl, $filename);
 		} elseif(strpos($filename, $tplUrl) !== false) {
 			$path = str_replace($tplUrl, $tplPath, $filename);
+			$url = $filename;
+		} elseif(strpos($filename, $sitePath) !== false) {
+			$path = $filename;
+			$url = str_replace($sitePath, $siteUrl, $filename);
+		} elseif(strpos($filename, $siteUrl) !== false) {
+			$path = str_replace($siteUrl, $sitePath, $filename);
 			$url = $filename;
 		} else {
 			$path = "{$tplPath}$filename";
