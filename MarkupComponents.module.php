@@ -58,9 +58,10 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	protected function addAssets(HookEvent $event) {
+		$parentEvent = $event->arguments(0);
+		if($parentEvent->object !== $event->page) return;
 		/** @var Config $config */
 		$config = $event->config;
-		$parentEvent = $event->arguments(0);
 		if($this->overwriteAjax && $this->importHelperJs && !$config->ajax) {
 			$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
 		}
