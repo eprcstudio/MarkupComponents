@@ -1,7 +1,7 @@
 const MarkupComponents = (function() {
 	const ajaxListeners = [];
 	const headers = new Headers({
-		"Content-Type": "application/json",
+		"Content-Type": "application/x-www-form-urlencoded",
 		"X-Requested-With": "XMLHttpRequest"
 	});
 
@@ -20,6 +20,7 @@ const MarkupComponents = (function() {
 	 * @param {HTMLElement | String} target - The element target in which to put
 	 * the page’s content. Can be a CSS selector. Defaults to `<body>`
 	 * @param {Object} options
+	 * @param {Object} options.body - Data to pass to the POST request
 	 * @param {Number} options.delay - Minimum amount of milliseconds to wait
 	 * before replacing the target’s content
 	 * @param {Boolean} options.history - Update history with new url
@@ -42,7 +43,7 @@ const MarkupComponents = (function() {
 		return new Promise((resolve, reject) => {
 			fetch(href, {
 				method: "POST",
-				body: JSON.stringify(options.body),
+				body: new URLSearchParams(options.body),
 				headers
 			})
 				.then((res) => res.json())
@@ -57,8 +58,7 @@ const MarkupComponents = (function() {
 						}
 						history.pushState({ history: true }, "", href);
 					}
-					options.delay -= Date.now() - time;
-					insertHtml(json, target, options.delay)
+					insertHtml(json, target, options.delay - (Date.now() - time))
 						.then(resolve)
 						.catch((error) => {
 							console.log(error);
@@ -130,8 +130,9 @@ const MarkupComponents = (function() {
 			setTimeout(() => {
 				target.innerHTML = "";
 				target.insertAdjacentHTML("beforeend", html);
-				scripts.forEach((script) => {
-					target.appendChild(script);
+				scripts.forEach((script, index) => {
+					const placeholder = document.getElementById(`script-placeholder-${index}`);
+					placeholder.parentElement.replaceWith(script);
 				});
 				requestAnimationFrame(() => {
 					trigger("ajax");
@@ -146,9 +147,11 @@ const MarkupComponents = (function() {
 		const matches = html.matchAll(regex);
 		const scripts = [];
 		for(const match of matches) {
-			if(!match.groups.content) continue;
+			if(!match.groups.content && !match.groups.attributes) continue;
 			const script = document.createElement("script");
-			script.insertAdjacentHTML("beforeend", match.groups.content);
+			if(match.groups.content) {
+				script.insertAdjacentHTML("beforeend", match.groups.content);
+			}
 			if(match.groups.attributes) {
 				const regex = / (?<name>[^=]*)(?:=(?:"|')(?<value>.*?)(?:"|'))?/gm;
 				const attributes = match.groups.attributes.matchAll(regex);
@@ -157,8 +160,8 @@ const MarkupComponents = (function() {
 					script.setAttribute(attribute.groups.name, attribute.groups.value);
 				};
 			}
+			html = html.replace(match[0], `<div id="script-placeholder-${scripts.length}"></div>`);
 			scripts.push(script);
-			html = html.replace(match[0], "");
 		};
 		return { html, scripts };
 	}
