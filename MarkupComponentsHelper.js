@@ -132,7 +132,7 @@ const MarkupComponents = (function() {
 				target.insertAdjacentHTML("beforeend", html);
 				scripts.forEach((script, index) => {
 					const placeholder = document.getElementById(`script-placeholder-${index}`);
-					placeholder.parentElement.replaceWith(script);
+					placeholder.replaceWith(script);
 				});
 				requestAnimationFrame(() => {
 					trigger("ajax");
