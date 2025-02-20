@@ -6,7 +6,7 @@ const MarkupComponents = (function() {
 	});
 
 	window.addEventListener("popstate", (e) => {
-		if(e.state.history) {
+		if(e.state && e.state.history) {
 			location.reload();
 		}
 	});
