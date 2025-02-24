@@ -78,8 +78,9 @@ const MarkupComponents = (function() {
 			return "body";
 		}
 		let selector = element.tagName.toLowerCase();
-		selector += (element.id != "") ? `#${element.id}` : "";
-		if(element.className) {
+		if(element.id != "") {
+			return `#${element.id}`;
+		} else if(element.className) {
 			const classes = element.className.split(/\s/);
 			for(let i = 0; i < classes.length; i++) {
 				if(element.parentElement.querySelectorAll(selector).length === 1) break;
@@ -98,6 +99,9 @@ const MarkupComponents = (function() {
 			if(typeof target === "string") {
 				target = document.querySelector(target);
 				if(!target) reject();
+			}
+			if(json.title) {
+				document.title = json.title;
 			}
 			const { html, scripts } = extractScripts(json.html);
 			for(const type of ["styles", "scripts"]) {
@@ -136,7 +140,7 @@ const MarkupComponents = (function() {
 				});
 				requestAnimationFrame(() => {
 					trigger("ajax");
-					resolve();
+					resolve(json);
 				});
 			}, Math.max(0, delay));
 		});

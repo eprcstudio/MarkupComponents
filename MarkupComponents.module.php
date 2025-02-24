@@ -3,7 +3,7 @@
 /**
  * Components/snippets system inspired by Kirby’s `snippet()` helper function
  * 
- * Copyright (c) 2023 EPRC
+ * Copyright (c) 2025 EPRC
  * Licensed under MIT License, see LICENSE
  *
  * https://eprc.studio
@@ -43,6 +43,13 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		if($this->autoAddAssets) {
 			$this->addHookAfter("PageRender::renderPage", $this, "addAssets");
 		}
+		if($this->overwriteAjax) {
+			if($this->config->ajax) {
+				$this->addHookAfter("PageRender::renderPage", $this, "convertToJson");
+			} elseif($this->importHelperJs) {
+				$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
+			}
+		}
 		if($this->autoFuel) {
 			if($this->wire($this->fuelName)) {
 				$this->set("fuelError", $this->fuelName);
@@ -60,31 +67,39 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	protected function addAssets(HookEvent $event) {
 		$parentEvent = $event->arguments(0);
 		if($parentEvent->object !== $event->page) return;
-		/** @var Config $config */
-		$config = $event->config;
-		if($this->overwriteAjax && $this->importHelperJs && !$config->ajax) {
-			$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
-		}
 		$scriptsHead = $this->printScripts(true);
 		$scripts = $this->printScripts();
 		$styles = $this->printStyles();
 		$html = $parentEvent->return;
 		$html = str_replace("</head>", "{$styles}{$scriptsHead}</head>", $html);
 		$html = str_replace("</body>", "{$scripts}</body>", $html);
-		if($this->overwriteAjax && $config->ajax) {
-			header("Content-Type: application/json");
-			$json = [
-				"html" => $html,
-				"styles" => [...$this->styles->each(["src", "attr"])],
-				"scripts" => [
-					...$this->scriptsHead->each(["src", "attr"]),
-					...$this->scripts->each(["src", "attr"])
-				]
-			];
-			$parentEvent->return = json_encode($json);
-		} else {
-			$parentEvent->return = $html;
-		}
+		$parentEvent->return = $html;
+	}
+
+	protected function convertToJson(HookEvent $event) {
+		$parentEvent = $event->arguments(0);
+		if($parentEvent->object !== $event->page) return;
+		header("Content-Type: application/json");
+		$json = array_merge($this->getDefaultJson($parentEvent->object), [
+			"html" => $parentEvent->return,
+			"styles" => [...$this->styles->each(["src", "attr"])],
+			"scripts" => [
+				...$this->scriptsHead->each(["src", "attr"]),
+				...$this->scripts->each(["src", "attr"])
+			]
+		]);
+		$parentEvent->return = json_encode($json);
+	}
+
+	/**
+	 * Allows to add additional data to the json returned in an ajax request
+	 * 
+	 * @var Page $page Current page being rendered
+	 * @return array Associative array defaulting with the page’s title
+	 * 
+	 */
+	public function ___getDefaultJson(Page $page) {
+		return [ "title" => $page->title ];
 	}
 
 	public function getComponents() {
@@ -98,14 +113,13 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	 * 
 	 */
 	public function listComponents($options = []) {
-		$defaultOptions = [
+		$options = array_merge([
 			"separator" => ",",
 			"quote" => "\"",
 			"closingQuote" => "",
 			"prepend" => "",
 			"append" => ""
-		];
-		$options = array_merge($defaultOptions, $options);
+		], $options);
 		if(!$options["closingQuote"]) $options["closingQuote"] = $options["quote"];
 		$separator = $options["closingQuote"] . $options["separator"] . $options["quote"];
 		return $this->components->implode($separator, "", [
