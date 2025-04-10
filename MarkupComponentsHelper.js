@@ -37,12 +37,13 @@ const MarkupComponents = (function() {
 			body: {},
 			delay: 0,
 			history: false,
-			historyIgnoreSegment: ""
+			historyIgnoreSegment: "",
+			method: "POST"
 		}, options);
 		const time = Date.now();
 		return new Promise((resolve, reject) => {
 			fetch(href, {
-				method: "POST",
+				method: options.method,
 				body: new URLSearchParams(options.body),
 				headers
 			})
