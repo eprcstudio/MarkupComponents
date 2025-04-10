@@ -44,6 +44,7 @@ const MarkupComponents = (function() {
 		return new Promise((resolve, reject) => {
 			fetch(href, {
 				method: options.method,
+				// check later for GET support: remove body and apply data to href (url params)
 				body: new URLSearchParams(options.body),
 				headers
 			})
@@ -57,6 +58,9 @@ const MarkupComponents = (function() {
 							const index = href.lastIndexOf(options.historyIgnoreSegment);
 							href = href.slice(0, index);
 						}
+						// if(options.method.toUpperCase() === "GET" && options.body.size) {
+						//	href += `?${options.body.toString()}`;
+						// }
 						history.pushState({ history: true }, "", href);
 					}
 					insertHtml(json, target, options.delay - (Date.now() - time))
