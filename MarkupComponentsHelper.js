@@ -1,12 +1,12 @@
-const MarkupComponents = (function() {
+const MarkupComponents = (function () {
 	const ajaxListeners = [];
 	const headers = new Headers({
 		"Content-Type": "application/x-www-form-urlencoded",
-		"X-Requested-With": "XMLHttpRequest"
+		"X-Requested-With": "XMLHttpRequest",
 	});
 
 	window.addEventListener("popstate", (e) => {
-		if(e.state && e.state.history) {
+		if (e.state && e.state.history) {
 			location.reload();
 		}
 	});
@@ -15,7 +15,7 @@ const MarkupComponents = (function() {
 	 * Load a page using `fetch` and then replace the target’s content. It will
 	 * also automatically handle inline scripts and components’ associated
 	 * scripts/styles to avoid duplicate imports
-	 * 
+	 *
 	 * @param {String} href - The page to load
 	 * @param {HTMLElement | String} target - The element target in which to put
 	 * the page’s content. Can be a CSS selector. Defaults to `<body>`
@@ -28,30 +28,33 @@ const MarkupComponents = (function() {
 	 * before adding new history state
 	 */
 	function load(href, target = document.body, options = {}) {
-		if(!href || !target) return;
-		if(typeof target === "string") {
+		if (!href || !target) return;
+		if (typeof target === "string") {
 			target = document.querySelector(target);
-			if(!target) return;
+			if (!target) return;
 		}
-		options = Object.assign({
-			body: {},
-			delay: 0,
-			history: false,
-			historyIgnoreSegment: "",
-			method: "POST"
-		}, options);
+		options = Object.assign(
+			{
+				body: {},
+				delay: 0,
+				history: false,
+				historyIgnoreSegment: "",
+				method: "POST",
+			},
+			options
+		);
 		const time = Date.now();
 		return new Promise((resolve, reject) => {
 			fetch(href, {
 				method: options.method,
-				// check later for GET support: remove body and apply data to href (url params)
+				// TODO check later for GET support: remove body and apply data to href (url params)
 				body: new URLSearchParams(options.body),
-				headers
+				headers,
 			})
 				.then((res) => res.json())
 				.then((json) => {
-					if(options.history) {
-						if(
+					if (options.history) {
+						if (
 							options.historyIgnoreSegment &&
 							typeof options.historyIgnoreSegment === "string"
 						) {
@@ -68,7 +71,7 @@ const MarkupComponents = (function() {
 						.catch((error) => {
 							console.log(error);
 							reject();
-						})
+						});
 				})
 				.catch((error) => {
 					console.error(error);
@@ -77,57 +80,57 @@ const MarkupComponents = (function() {
 		});
 	}
 
-	function generateSelector(element) {
-		if(!(element instanceof HTMLElement)) return "";
-		if(element.tagName.toLowerCase() == "body") {
+	function generateSelector(el) {
+		if (!(el instanceof HTMLElement)) return "";
+		if (el.tagName.toLowerCase() == "body") {
 			return "body";
 		}
-		let selector = element.tagName.toLowerCase();
-		if(element.id != "") {
-			return `#${element.id}`;
-		} else if(element.className) {
-			const classes = element.className.split(/\s/);
-			for(let i = 0; i < classes.length; i++) {
-				if(element.parentElement.querySelectorAll(selector).length === 1) break;
+		let selector = el.tagName.toLowerCase();
+		if (el.id != "") {
+			return `#${el.id}`;
+		} else if (el.className) {
+			const classes = el.className.split(/\s/);
+			for (let i = 0; i < classes.length; i++) {
+				if (el.parentElement.querySelectorAll(selector).length === 1) break;
 				selector += `.${classes[i]}`;
 			}
 		}
-		if(element.parentElement.querySelectorAll(selector).length > 1) {
-			selector += `:nth-child(${Array.from(element.parentElement.children).indexOf(element)})`;
+		if (el.parentElement.querySelectorAll(selector).length > 1) {
+			selector += `:nth-child(${Array.from(el.parentElement.children).indexOf(el)})`;
 		}
-		return generateSelector(element.parentElement) + " > " + selector;
+		return generateSelector(el.parentElement) + " > " + selector;
 	}
 
 	function insertHtml(json, target, delay = 0) {
 		return new Promise((resolve, reject) => {
-			if(!json || !target) reject();
-			if(typeof target === "string") {
+			if (!json || !target) reject();
+			if (typeof target === "string") {
 				target = document.querySelector(target);
-				if(!target) reject();
+				if (!target) reject();
 			}
-			if(json.title) {
+			if (json.title) {
 				document.title = json.title;
 			}
 			const { html, scripts } = extractScripts(json.html);
-			for(const type of ["styles", "scripts"]) {
-				if(!json[type]) continue;
-				for(const file of json[type]) {
+			for (const type of ["styles", "scripts"]) {
+				if (!json[type]) continue;
+				for (const file of json[type]) {
 					const isJs = type === "scripts";
 					const href = isJs ? "src" : "href";
 					// skip already imported files
-					if(document.querySelector(`[${href}="${file.src}"]`)) continue;
+					if (document.querySelector(`[${href}="${file.src}"]`)) continue;
 					const tag = document.createElement(isJs ? "script" : "link");
 					tag[href] = file.src;
-					if(!isJs) {
+					if (!isJs) {
 						tag.rel = "stylesheet";
 						tag.type = "text/css";
 					} else {
 						// load synchronously, in case of js dependencies
 						tag.async = false;
 					}
-					for(const name in file.attr) {
+					for (const name in file.attr) {
 						const value = file.attr[name];
-						if(isNaN(parseInt(name))) {
+						if (isNaN(parseInt(name))) {
 							tag.setAttribute(name, value);
 						} else {
 							tag.setAttribute(value, "");
@@ -136,84 +139,88 @@ const MarkupComponents = (function() {
 					document.head.appendChild(tag);
 				}
 			}
-			setTimeout(() => {
-				target.innerHTML = "";
-				target.insertAdjacentHTML("beforeend", html);
-				scripts.forEach((script, index) => {
-					const placeholder = document.getElementById(`script-placeholder-${index}`);
-					placeholder.replaceWith(script);
-				});
-				requestAnimationFrame(() => {
-					trigger("ajax");
-					resolve(json);
-				});
-			}, Math.max(0, delay));
+			setTimeout(
+				() => {
+					target.innerHTML = "";
+					target.insertAdjacentHTML("beforeend", html);
+					scripts.forEach((script, index) => {
+						const placeholder = document.getElementById(`script-placeholder-${index}`);
+						placeholder.replaceWith(script);
+					});
+					requestAnimationFrame(() => {
+						trigger("ajax");
+						resolve(json);
+					});
+				},
+				Math.max(0, delay)
+			);
 		});
 	}
 
+	// TODO add option in the module’s settings to OPT-IN this insecure feature
 	function extractScripts(html) {
 		const regex = /<script(?<attributes>.*)>(?<content>(?:.|\n)*?)<\/script>/gm;
 		const matches = html.matchAll(regex);
 		const scripts = [];
-		for(const match of matches) {
-			if(!match.groups.content && !match.groups.attributes) continue;
+		for (const match of matches) {
+			if (!match.groups.content && !match.groups.attributes) continue;
 			const script = document.createElement("script");
-			if(match.groups.content) {
+			if (match.groups.content) {
 				script.insertAdjacentHTML("beforeend", match.groups.content);
 			}
-			if(match.groups.attributes) {
+			if (match.groups.attributes) {
 				const regex = / (?<name>[^=]*)(?:=(?:"|')(?<value>.*?)(?:"|'))?/gm;
 				const attributes = match.groups.attributes.matchAll(regex);
-				for(const attribute of attributes) {
-					if(!attribute.groups.name) continue;
+				for (const attribute of attributes) {
+					if (!attribute.groups.name) continue;
 					script.setAttribute(attribute.groups.name, attribute.groups.value);
-				};
+				}
 			}
 			html = html.replace(match[0], `<div id="script-placeholder-${scripts.length}"></div>`);
 			scripts.push(script);
-		};
+		}
 		return { html, scripts };
 	}
 
 	/**
 	 * Add a listener to the specified event. Only "load" and "ajax" are supported
-	 * 
+	 *
 	 * @param {string} event - The event to listen for
 	 * @param {string} listener - The callback to call when the event is triggered
 	 * @param {boolean} triggerAfterAjax - Call the listener after each ajax request
 	 */
 	function on(event, listener, triggerAfterAjax = false) {
-		if(event === "load") {
-			if(document.readyState === "complete") {
+		if (event === "load") {
+			if (document.readyState === "complete") {
 				listener();
 			} else {
 				window.addEventListener("load", listener);
 			}
-			if(triggerAfterAjax) {
+			if (triggerAfterAjax) {
 				on("ajax", listener);
 			}
-		} else if(event === "ajax") {
+		} else if (event === "ajax") {
 			ajaxListeners.push(listener);
 		}
 	}
 
 	function off(event, listener) {
-		if(event === "load") {
+		if (event === "load") {
 			window.removeEventListener(event, listener);
-		} else if(event === "ajax") {
+		} else if (event === "ajax") {
 			ajaxListeners = ajaxListeners.filter((c) => c !== listener);
 		}
 	}
 
 	function trigger(event) {
-		if(event === "ajax") {
-			ajaxListeners.forEach(listener => listener());
+		if (event === "ajax") {
+			ajaxListeners.forEach((listener) => listener());
 		}
 	}
 
 	return {
 		load,
 		on,
-		off
-	}
+		off,
+	};
 })();

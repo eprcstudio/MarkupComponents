@@ -78,7 +78,11 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 
 	protected function convertToJson(HookEvent $event) {
 		$parentEvent = $event->arguments(0);
-		if($parentEvent->object !== $event->page) return;
+		if(
+			$parentEvent->object !== $event->page
+			|| !empty(preg_grep("/application\/json/", headers_list()))
+			|| !empty(preg_grep("/text\/plain/", headers_list()))
+		) return;
 		header("Content-Type: application/json");
 		$json = array_merge($this->getDefaultJson($parentEvent->object), [
 			"html" => $parentEvent->return,
