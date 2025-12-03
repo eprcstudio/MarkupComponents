@@ -159,7 +159,7 @@ const MarkupComponents = (function () {
 
 	// TODO add option in the module’s settings to OPT-IN this insecure feature
 	function extractScripts(html) {
-		const regex = /<script(?<attributes>.*)>(?<content>(?:.|\n)*?)<\/script>/gm;
+		const regex = /<script(?<attributes>[^<]*)>(?<content>(?:.|\n)*?)<\/script>/gm;
 		const matches = html.matchAll(regex);
 		const scripts = [];
 		for (const match of matches) {
