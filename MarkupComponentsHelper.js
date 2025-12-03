@@ -173,7 +173,7 @@ const MarkupComponents = (function () {
 				const attributes = match.groups.attributes.matchAll(regex);
 				for (const attribute of attributes) {
 					if (!attribute.groups.name) continue;
-					script.setAttribute(attribute.groups.name, attribute.groups.value);
+					script.setAttribute(attribute.groups.name, attribute.groups.value ?? "");
 				}
 			}
 			html = html.replace(match[0], `<div id="script-placeholder-${scripts.length}"></div>`);
