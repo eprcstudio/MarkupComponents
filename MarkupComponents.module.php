@@ -59,7 +59,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 				$this->wire($this->fuelName ?: "mc", $this);
 			}
 		}
-		if($this->functionsApi && $this->page->template != "admin") {
+		if($this->functionsApi) {
 			include_once __DIR__ . "/MarkupComponentsFunctions.php";
 		}
 	}
