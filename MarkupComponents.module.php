@@ -26,12 +26,14 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 
 	public function __construct() {
 		parent::__construct();
+		$this->set("allowUnsafeInline", 0);
 		$this->set("autoAddAssets", 0);
 		$this->set("autoFuel", 0);
 		$this->set("fuelName", "mc");
 		$this->set("functionsApi", 0);
-		$this->set("overwriteAjax", 0);
 		$this->set("importHelperJs", 0);
+		$this->set("overwriteAjax", 0);
+		$this->set("updateCSP", 0);
 	}
 
 	public function init() {
@@ -42,13 +44,6 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$this->stylesNoscript = new WireArray();
 		if($this->autoAddAssets) {
 			$this->addHookAfter("PageRender::renderPage", $this, "addAssets");
-		}
-		if($this->overwriteAjax) {
-			if($this->config->ajax) {
-				$this->addHookAfter("PageRender::renderPage", $this, "convertToJson");
-			} elseif($this->importHelperJs) {
-				$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
-			}
 		}
 		if($this->autoFuel) {
 			if($this->wire($this->fuelName)) {
@@ -61,6 +56,13 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		}
 		if($this->functionsApi) {
 			include_once __DIR__ . "/MarkupComponentsFunctions.php";
+		}
+		if($this->overwriteAjax) {
+			if($this->config->ajax) {
+				$this->addHookAfter("PageRender::renderPage", $this, "convertToJson");
+			} elseif($this->importHelperJs) {
+				$this->script(__DIR__ . "/MarkupComponentsHelper.js", true);
+			}
 		}
 	}
 
@@ -84,6 +86,8 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			|| !empty(preg_grep("/text\/plain/", headers_list()))
 		) return;
 		header("Content-Type: application/json");
+		// Note: <noscript> styles are not sent as they are irrelevant in a json
+		// most likely fetched using... javascript
 		$json = array_merge($this->getDefaultJson($parentEvent->object), [
 			"html" => $parentEvent->return,
 			"styles" => [...$this->styles->each(["src", "attr"])],
@@ -96,7 +100,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	/**
-	 * Allows to add additional data to the json returned in an ajax request
+	 * Allow to add additional data to the json returned in an ajax request
 	 * 
 	 * @var Page $page Current page being rendered
 	 * @return array Associative array defaulting with the page’s title
@@ -111,7 +115,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	/**
-	 * Returns the components’ name as a string, using a separator and quotes
+	 * Return the components’ name as a string, using a separator and quotes
 	 * 
 	 * @return string
 	 * 
@@ -133,7 +137,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	/**
-	 * Adds a `<script>` inside either `<head>` or `<body>` tags
+	 * Add a `<script>` inside either `<head>` or `<body>` tags
 	 * 
 	 * You can also specify attributes, e.g. `type="module"`, with an array:
 	 * `["type" => "module"]`
@@ -149,9 +153,10 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function script($filename, $addToHead = false, $attr = []) {
 		if(!$filename) return;
 		if(strpos($filename, "http") !== false) {
+			$external = true;
 			$fullPath = $filename;
 		} else {
-			if(strpos($filename, ".js") === false) {
+			if(stripos($filename, ".js") === false) {
 				$filename .= ".js";
 			}
 			[$path, $url] = $this->getPathAndUrl($filename);
@@ -162,15 +167,19 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			$attr = $addToHead;
 			$addToHead = false;
 		}
+		$inline = array_key_exists("inline", $attr);
+		unset($attr["inline"]);
 		$script = WireData([ "src" => $fullPath, "attr" => $attr ]);
+		if(empty($external) && $inline && $this->allowUnsafeInline) {
+			$script->content = file_get_contents($path);
+			$this->appendHashToCSP($script->content, "script");
+		}
 		if($addToHead) {
 			if(!$this->scriptsHead->has("src=$fullPath")) {
 				$this->scriptsHead->add($script);
 			}
-		} else {
-			if(!$this->scripts->has("src=$fullPath")) {
-				$this->scripts->add($script);
-			}
+		} elseif(!$this->scripts->has("src=$fullPath")) {
+			$this->scripts->add($script);
 		}
 	}
 
@@ -195,7 +204,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 	
 	/**
-	 * Prints the `<script>` tags
+	 * Print the `<script>` tags
 	 * 
 	 * @var bool $head Print the head scripts?
 	 * @return string
@@ -204,7 +213,13 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function printScripts($head = false) {
 		$str = "";
 		foreach($this->getScripts($head) as $script) {
-			$str .= "<script src=\"$script->src\" {$this->attrToString($script->attr)}></script>";
+			$str .= "<script {$this->attrToString($script->attr)}";
+			if(!empty($script->content)) {
+				$str .= ">$script->content";
+			} else {
+				$str .= " src=\"$script->src\">";
+			}
+			$str .= "</script>";
 		}
 		return $str;
 	}
@@ -221,7 +236,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 	
 	/**
-	 * Adds a `<style>` inside the `<head>` tag
+	 * Add a `<style>` inside the `<head>` tag
 	 * 
 	 * You can also specify attributes, e.g. `media="print"`, with an array:
 	 * `["media" => "print"]`
@@ -233,6 +248,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function style($filename, $attr = []) {
 		if(!$filename) return;
 		if(strpos($filename, "http") !== false) {
+			$external = true;
 			$fullPath = $filename;
 		} else {
 			if(strpos($filename, ".css") === false) {
@@ -242,18 +258,21 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 			if(!file_exists($path)) return;
 			$fullPath = "$url?v=" . filemtime($path);
 		}
-		if(array_key_exists("noscript", $attr) && $attr["noscript"]) {
+		$inline = array_key_exists("inline", $attr);
+		unset($attr["inline"]);
+		$noscript = array_key_exists("noscript", $attr);
+		unset($attr["noscript"]);
+		$style = WireData([ "src" => $fullPath, "attr" => $attr ]);
+		if(empty($external) && $inline && $this->allowUnsafeInline) {
+			$style->content = file_get_contents($path);
+			$this->appendHashToCSP($style->content, "style");
+		}
+		if($noscript) {
 			if(!$this->stylesNoscript->has("src=$fullPath")) {
-				$this->stylesNoscript->add(WireData([
-					"src" => $fullPath,
-					"content" => file_get_contents($path)
-				]));
+				$this->stylesNoscript->add($style);
 			}
 		} elseif(!$this->styles->has("src=$fullPath")) {
-			$this->styles->add(WireData([
-				"src" => $fullPath,
-				"attr" => $this->attrToString($attr)
-			]));
+			$this->styles->add($style);
 		}
 	}
 
@@ -274,8 +293,8 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	 * @param string $filename Filename or URL pointing to the style file
 	 * 
 	 */
-	public function noscript($filename) {
-		$this->style($filename, ["noscript" => true]);
+	public function noscript($filename, $attr = []) {
+		$this->style($filename, array_merge($attr, ["noscript" => true]));
 	}
 
 	/**
@@ -287,7 +306,7 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	}
 
 	/**
-	 * Prints the `<style>` tags
+	 * Print the `<style>` tags
 	 * 
 	 * @return string
 	 * 
@@ -295,14 +314,22 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	public function printStyles() {
 		$str = "";
 		foreach($this->styles as $style) {
-			$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" {$this->attrToString($style->attr)}>";
+			if(!empty($style->content)) {
+				$str .= "<style {$this->attrToString($style->attr)}>$style->content</style>";
+			} else {
+				$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" {$this->attrToString($style->attr)}>";
+			}
 		}
 		if($this->stylesNoscript->count()) {
-			$str .= "<noscript><style>";
+			$str .= "<noscript>";
 			foreach($this->stylesNoscript as $style) {
-				$str .= $style->content;
+				if(!empty($style->content)) {
+					$str .= "<style {$this->attrToString($style->attr)}>$style->content</style>";
+				} else {
+					$str .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"$style->src\" {$this->attrToString($style->attr)}>";
+				}
 			}
-			$str .= "</style></noscript>";
+			$str .= "</noscript>";
 		}
 		return $str;
 	}
@@ -315,6 +342,35 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	 */
 	public function styles() {
 		return $this->printStyles();
+	}
+
+	/**
+	 * Append inline script/style hash to the Content-Security-Policy header
+	 * 
+	 * 
+	 * 
+	 */
+	private function appendHashToCSP($data, $type) {
+		if(
+			!$this->updateCSP
+			|| !$data
+			|| !in_array($type, ["script", "style"])
+		) return;
+		$hash = hash("sha256", $data);
+		$csp = array_filter(headers_list(), function($header) {
+			return strpos($header, "Content-Security-Policy") !== false;
+		});
+		if(count($csp)) {
+			$csp = reset($csp);
+		}
+		if(empty($csp)) {
+			$csp = "Content-Security-Policy: $type-src 'self' 'sha256-$hash'";
+		} elseif(strpos($csp, "$type-src") !== false) {
+			$csp = str_replace("$type-src", "$type-src 'sha256-$hash'", $csp);
+		} else {
+			$csp .= "$type-src 'self' 'sha256-$hash';";
+		}
+		header($csp);
 	}
 
 	private function attrToString($attr = []) {
@@ -486,6 +542,27 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 		$f->label = $this->_("Automatically add .css and .js files on page render?");
 		$f->label2 = $this->_("Yes");
 		$f->checked = !!$this->autoAddAssets;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "allowUnsafeInline");
+		$f->columnWidth = 50;
+		$f->description = $this->_("When specifying [\"inline\" => true] in the `attr` argument of the `script()`, `style()` or `noscript()` methods, you can output the file’s content directly within `<script>` or `<style>` tags. Please note this won’t have any effect when using the ajax overwriting option");
+		$f->label = $this->_("Allow unsafe inline css/js");
+		$f->label2 = $this->_("Yes");
+		$f->checked = !!$this->allowUnsafeInline;
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr("name", "updateCSP");
+		$f->columnWidth = 50;
+		$f->description = $this->_("To help prevent XSS, hashes of the inline scripts/styles can be automatically added to the CSP header. Note that if you don’t already have a CSP in place it may result in external and/or inline scripts/styles to not load, such as TracyDebugger’s");
+		$f->label = $this->_("Append file hashes to Content-Security-Policy?");
+		$f->label2 = $this->_("Yes");
+		$f->showIf = "allowUnsafeInline=1";
+		$f->checked = !!$this->updateCSP;
 		$inputfields->add($f);
 	
 		/** @var InputfieldCheckbox $f */

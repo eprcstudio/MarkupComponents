@@ -6,7 +6,7 @@ const MarkupComponents = (function () {
 	});
 
 	window.addEventListener("popstate", (e) => {
-		if (e.state && e.state.history) {
+		if(e.state && e.state.history) {
 			location.reload();
 		}
 	});
@@ -28,10 +28,10 @@ const MarkupComponents = (function () {
 	 * before adding new history state
 	 */
 	function load(href, target = document.body, options = {}) {
-		if (!href || !target) return;
-		if (typeof target === "string") {
+		if(!href || !target) return;
+		if(typeof target === "string") {
 			target = document.querySelector(target);
-			if (!target) return;
+			if(!target) return;
 		}
 		options = Object.assign(
 			{
@@ -53,8 +53,8 @@ const MarkupComponents = (function () {
 			})
 				.then((res) => res.json())
 				.then((json) => {
-					if (options.history) {
-						if (
+					if(options.history) {
+						if(
 							options.historyIgnoreSegment &&
 							typeof options.historyIgnoreSegment === "string"
 						) {
@@ -81,21 +81,21 @@ const MarkupComponents = (function () {
 	}
 
 	function generateSelector(el) {
-		if (!(el instanceof HTMLElement)) return "";
-		if (el.tagName.toLowerCase() == "body") {
+		if(!(el instanceof HTMLElement)) return "";
+		if(el.tagName.toLowerCase() == "body") {
 			return "body";
 		}
 		let selector = el.tagName.toLowerCase();
-		if (el.id != "") {
+		if(el.id != "") {
 			return `#${el.id}`;
-		} else if (el.className) {
+		} else if(el.className) {
 			const classes = el.className.split(/\s/);
-			for (let i = 0; i < classes.length; i++) {
-				if (el.parentElement.querySelectorAll(selector).length === 1) break;
+			for(let i = 0; i < classes.length; i++) {
+				if(el.parentElement.querySelectorAll(selector).length === 1) break;
 				selector += `.${classes[i]}`;
 			}
 		}
-		if (el.parentElement.querySelectorAll(selector).length > 1) {
+		if(el.parentElement.querySelectorAll(selector).length > 1) {
 			selector += `:nth-child(${Array.from(el.parentElement.children).indexOf(el)})`;
 		}
 		return generateSelector(el.parentElement) + " > " + selector;
@@ -103,34 +103,34 @@ const MarkupComponents = (function () {
 
 	function insertHtml(json, target, delay = 0) {
 		return new Promise((resolve, reject) => {
-			if (!json || !target) reject();
-			if (typeof target === "string") {
+			if(!json || !target) reject();
+			if(typeof target === "string") {
 				target = document.querySelector(target);
-				if (!target) reject();
+				if(!target) reject();
 			}
-			if (json.title) {
+			if(json.title) {
 				document.title = json.title;
 			}
 			const { html, scripts } = extractScripts(json.html);
-			for (const type of ["styles", "scripts"]) {
-				if (!json[type]) continue;
-				for (const file of json[type]) {
+			for(const type of ["styles", "scripts"]) {
+				if(!json[type]) continue;
+				for(const file of json[type]) {
 					const isJs = type === "scripts";
 					const href = isJs ? "src" : "href";
 					// skip already imported files
-					if (document.querySelector(`[${href}="${file.src}"]`)) continue;
+					if(document.querySelector(`[${href}="${file.src}"]`)) continue;
 					const tag = document.createElement(isJs ? "script" : "link");
 					tag[href] = file.src;
-					if (!isJs) {
+					if(!isJs) {
 						tag.rel = "stylesheet";
 						tag.type = "text/css";
 					} else {
 						// load synchronously, in case of js dependencies
 						tag.async = false;
 					}
-					for (const name in file.attr) {
+					for(const name in file.attr) {
 						const value = file.attr[name];
-						if (isNaN(parseInt(name))) {
+						if(isNaN(parseInt(name))) {
 							tag.setAttribute(name, value);
 						} else {
 							tag.setAttribute(value, "");
@@ -162,17 +162,18 @@ const MarkupComponents = (function () {
 		const regex = /<script(?<attributes>[^<]*)>(?<content>(?:.|\n)*?)<\/script>/gm;
 		const matches = html.matchAll(regex);
 		const scripts = [];
-		for (const match of matches) {
-			if (!match.groups.content && !match.groups.attributes) continue;
+		for(const match of matches) {
+			if(!match.groups.content && !match.groups.attributes) continue;
 			const script = document.createElement("script");
-			if (match.groups.content) {
+			script.type = "text/javascript";
+			if(match.groups.content) {
 				script.insertAdjacentHTML("beforeend", match.groups.content);
 			}
-			if (match.groups.attributes) {
+			if(match.groups.attributes) {
 				const regex = / (?<name>[^=]*)(?:=(?:"|')(?<value>.*?)(?:"|'))?/gm;
 				const attributes = match.groups.attributes.matchAll(regex);
-				for (const attribute of attributes) {
-					if (!attribute.groups.name) continue;
+				for(const attribute of attributes) {
+					if(!attribute.groups.name) continue;
 					script.setAttribute(attribute.groups.name, attribute.groups.value ?? "");
 				}
 			}
@@ -190,30 +191,30 @@ const MarkupComponents = (function () {
 	 * @param {boolean} triggerAfterAjax - Call the listener after each ajax request
 	 */
 	function on(event, listener, triggerAfterAjax = false) {
-		if (event === "load") {
-			if (document.readyState === "complete") {
+		if(event === "load") {
+			if(document.readyState === "complete") {
 				listener();
 			} else {
 				window.addEventListener("load", listener);
 			}
-			if (triggerAfterAjax) {
+			if(triggerAfterAjax) {
 				on("ajax", listener);
 			}
-		} else if (event === "ajax") {
+		} else if(event === "ajax") {
 			ajaxListeners.push(listener);
 		}
 	}
 
 	function off(event, listener) {
-		if (event === "load") {
+		if(event === "load") {
 			window.removeEventListener(event, listener);
-		} else if (event === "ajax") {
+		} else if(event === "ajax") {
 			ajaxListeners = ajaxListeners.filter((c) => c !== listener);
 		}
 	}
 
 	function trigger(event) {
-		if (event === "ajax") {
+		if(event === "ajax") {
 			ajaxListeners.forEach((listener) => listener());
 		}
 	}

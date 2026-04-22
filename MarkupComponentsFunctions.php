@@ -8,7 +8,7 @@ function callMarkupComponentsFunction($name, ...$arguments) {
 
 if(!function_exists("script")) {
 	/**
-	 * Adds a `<script>` inside either `<head>` or `<body>` tags
+	 * Add a `<script>` inside either `<head>` or `<body>` tags
 	 * 
 	 * You can also specify attributes, e.g. `type="module"`, with an array:
 	 * `["type" => "module"]`
@@ -42,7 +42,7 @@ if(!function_exists("js")) {
 
 if(!function_exists("printScripts")) {
 	/**
-	 * Prints the `<script>` tags
+	 * Print the `<script>` tags
 	 * 
 	 * @var bool $head Print the head scripts?
 	 * @return string
@@ -68,7 +68,7 @@ if(!function_exists("scripts")) {
 
 if(!function_exists("style")) {
 	/**
-	 * Adds a `<style>` inside the `<head>` tag
+	 * Add a `<style>` inside the `<head>` tag
 	 * 
 	 * You can also specify attributes, e.g. `media="print"`, with an array:
 	 * `["media" => "print"]`
@@ -102,14 +102,14 @@ if(!function_exists("noscript")) {
 	 * @param string $filename Filename or URL pointing to the style file
 	 * 
 	 */
-	function noscript($filename) {
-		callMarkupComponentsFunction("noscript", $filename);
+	function noscript($filename, $attr = []) {
+		callMarkupComponentsFunction("noscript", $filename, $attr);
 	}
 }
 
 if(!function_exists("printStyles")) {
 	/**
-	 * Prints the `<style>` tags
+	 * Print the `<style>` tags
 	 * 
 	 * @return string
 	 * 
