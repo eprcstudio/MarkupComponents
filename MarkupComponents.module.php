@@ -347,7 +347,8 @@ class MarkupComponents extends WireData implements Module, ConfigurableModule {
 	/**
 	 * Append inline script/style hash to the Content-Security-Policy header
 	 * 
-	 * 
+	 * @param string $data The file’s content
+	 * @param string $type Can be either `"script"` or `"style"`
 	 * 
 	 */
 	private function appendHashToCSP($data, $type) {
